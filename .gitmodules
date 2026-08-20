@@ -1,0 +1,21 @@
+[submodule "lib/deepstate-contracts"]
+	path = lib/deepstate-contracts
+	url = https://github.com/Deepstate-Protocol/deepstate-contracts.git
+[submodule "lib/forge-std"]
+	path = lib/forge-std
+	url = https://github.com/foundry-rs/forge-std.git
+[submodule "lib/openzeppelin-contracts"]
+	path = lib/openzeppelin-contracts
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts.git
+[submodule "lib/protocol-fees"]
+	path = lib/protocol-fees
+	url = https://github.com/Uniswap/protocol-fees.git
+[submodule "lib/v4-core"]
+	path = lib/v4-core
+	url = https://github.com/Uniswap/v4-core.git
+[submodule "lib/v4-hooks-public"]
+	path = lib/v4-hooks-public
+	url = https://github.com/Uniswap/v4-hooks-public.git
+[submodule "lib/v4-periphery"]
+	path = lib/v4-periphery
+	url = https://github.com/Uniswap/v4-periphery.git

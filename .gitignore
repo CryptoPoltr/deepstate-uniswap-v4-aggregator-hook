@@ -1,0 +1,47 @@
+# Foundry build artifacts
+cache/
+out/
+foundry-out/
+deepstate-out/
+broadcast/
+
+# Coverage
+coverage/
+coverage.lcov
+lcov.info
+
+# Static analysis
+slither.json
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editors / IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Python / tooling leftovers
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Misc generated files
+*.lcov
