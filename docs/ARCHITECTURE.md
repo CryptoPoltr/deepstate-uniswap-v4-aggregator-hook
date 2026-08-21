@@ -2,6 +2,8 @@
 
 This document describes the execution and planning details behind the DeepState Aggregator Hook. The main [`README.md`](../README.md) is intentionally shorter and integration-focused.
 
+The verified Robinhood Chain deployment uses `DeepStatePlanner` at `0xBCAA32dBb2CfB1D13179B7CbAFe29De390A81648` and the singleton `DeepStateAggregator` at `0xd11758Ec960e365Df35E3790b172B25c708A6888`, bound to DeepState V1 `0x6cf19308C22FC82ea620Fa0B3E94948d20f27B96` and the canonical Robinhood v4 `PoolManager` `0x8366a39CC670B4001A1121B8F6A443A643e40951`. See [`../deployments/4663.md`](../deployments/4663.md) for the deployment record.
+
 ## Components
 
 ### `DeepStateAggregator`

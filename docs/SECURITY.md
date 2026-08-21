@@ -13,6 +13,18 @@ The integration assumes correct behavior from the pinned deployments/libraries i
 
 The hook does not attempt to make arbitrary hostile token implementations safe.
 
+### Verified Robinhood deployment
+
+The currently documented Robinhood Chain deployment was checked with `VerifyDeepStateDeployment.s.sol` and binds the Aggregator to:
+
+- `PoolManager`: `0x8366a39CC670B4001A1121B8F6A443A643e40951`;
+- `DeepStatePlanner`: `0xBCAA32dBb2CfB1D13179B7CbAFe29De390A81648`;
+- DeepState V1: `0x6cf19308C22FC82ea620Fa0B3E94948d20f27B96`.
+
+The deployed Aggregator is `0xd11758Ec960e365Df35E3790b172B25c708A6888`; its address encodes proposed first-byte ID `0xD1` and the required hook permission mask `0x2888`. The routing-fee recipient was `0x59606fB6b9377Fb08B32B490f34Ae699DeAFeA66` at post-deployment verification time and may subsequently be rotated by the existing recipient.
+
+The full address record is maintained in [`../deployments/4663.md`](../deployments/4663.md).
+
 ## Core execution properties
 
 ### Live re-planning

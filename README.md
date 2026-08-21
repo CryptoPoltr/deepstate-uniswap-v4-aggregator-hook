@@ -146,8 +146,12 @@ test/
 
 docs/
 ├── ARCHITECTURE.md
+├── DEPLOYMENT.md
 ├── SECURITY.md
 └── V12_AUDIT.md
+
+deployments/
+└── 4663.md
 
 audits/
 ├── README.md
@@ -238,11 +242,28 @@ See [`docs/V12_AUDIT.md`](./docs/V12_AUDIT.md) for the exact audit/remediation r
 
 ## Deployment
 
-1. Select the canonical DeepState V1 deployment for the target chain.
-2. Deploy `DeepStatePlanner(deepstate)`.
-3. Mine a valid Uniswap v4 hook address for `DeepStateAggregator` with the required hook permission bits.
-4. Deploy `DeepStateAggregator(poolManager, planner, routingFeeRecipient)` at the mined address.
-5. Initialize v4 pools for supported DeepState pairs with `fee = 0` and `tickSpacing = 1`.
+The DeepState Planner and Aggregator Hook are deployed and independently verified on Robinhood Chain (`chainId = 4663`):
+
+| Component | Address |
+| --- | --- |
+| Uniswap v4 `PoolManager` | `0x8366a39CC670B4001A1121B8F6A443A643e40951` |
+| DeepState V1 | `0x6cf19308C22FC82ea620Fa0B3E94948d20f27B96` |
+| `DeepStatePlanner` | `0xBCAA32dBb2CfB1D13179B7CbAFe29De390A81648` |
+| `DeepStateAggregator` | `0xd11758Ec960e365Df35E3790b172B25c708A6888` |
+| Routing-fee recipient at verification time | `0x59606fB6b9377Fb08B32B490f34Ae699DeAFeA66` |
+
+Deployment transactions:
+
+- `DeepStatePlanner`: [`0x4b6494ac3ef1a905de81d4d25a7fff16e3392d5e7d14d35ef1c2b4cc06170fde`](https://robinhoodchain.blockscout.com/tx/0x4b6494ac3ef1a905de81d4d25a7fff16e3392d5e7d14d35ef1c2b4cc06170fde)
+- `DeepStateAggregator`: [`0xbb2d4698ecf2051472a06b12c1f70929003396591f37e7f0aab9bb45cd6616ce`](https://robinhoodchain.blockscout.com/tx/0xbb2d4698ecf2051472a06b12c1f70929003396591f37e7f0aab9bb45cd6616ce)
+
+`VerifyDeepStateDeployment.s.sol` completed successfully and confirmed the chain ID, immutable PoolManager / Planner / DeepState bindings, routing-fee recipient, first-byte ID `0xD1`, and hook permission mask `0x2888`. The deployed hook address therefore satisfies both the proposed DeepState Aggregator ID and the Uniswap v4 hook-permission bits.
+
+`0xD1` remains a **proposed upstream Aggregator Hook ID**. The existing deployment intentionally uses it, while upstream integration remains a separate step. If DeepState is integrated upstream with a different ID, a new CREATE2 hook deployment will be required.
+
+The deployment procedure remains staged and fail-closed: freeze the exact build, deploy and verify the Planner, mine the Aggregator address from its final constructor inputs, deploy through the canonical CREATE2 proxy, independently verify the result, and only then initialize v4 shell pools.
+
+See [`deployments/4663.md`](./deployments/4663.md) for the deployment record and [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md) for the reproducible deployment procedure.
 
 The hook permissions inherited from `BaseAggregatorHook` are:
 
@@ -255,7 +276,21 @@ The hook permissions inherited from `BaseAggregatorHook` are:
 
 The public `v4-hooks-public` aggregator convention uses recognizable address prefixes so routing software can identify the external liquidity source. Adding a new protocol also requires updating the upstream mining flow.
 
-DeepState does not currently have an assigned ID in the upstream table. An upstream/production address intended to follow that convention should use an identifier accepted by the Uniswap maintainers rather than an invented prefix.
+The proposed DeepState V1 first-byte ID is **`0xD1`**: `D` follows the upstream rule that the first hex character matches the protocol name, while this integration uses `1` for the first DeepState aggregator type/version. As checked on **2026-08-21**, `D1` is not listed in the public upstream table. It remains proposed until DeepState support using that ID is integrated upstream.
+
+Production mining is provided by `script/MineDeepStateAggregator.s.sol` and `script/utils/AggregatorHookMiner.sol`. The miner constrains both the most-significant byte to `0xD1` and the low 14 address bits to the permissions inherited from `BaseAggregatorHook`. `script/mine_deepstate_hook.sh` advances through bounded salt windows until a match is found.
+
+After `DeepStatePlanner` is deployed, mine the final hook address against the target chain:
+
+```bash
+export RPC_URL=<robinhood-rpc>
+export PLANNER=<deployed-deepstate-planner>
+export ROUTING_FEE_RECIPIENT=<routing-fee-recipient>
+
+./script/mine_deepstate_hook.sh
+```
+
+The Robinhood production tooling pins the canonical PoolManager and canonical CREATE2 deployer `0x4e59b44847b379578588920cA78FbF26c0B4956C` rather than accepting deployment-time overrides. Mining and deployment must use identical creation code, compiler settings, constructor arguments, deployer, and salt. The final deploy script also requires `CONFIRM_D1=true` as an explicit acknowledgement that the deployment intentionally uses the still-proposed `D1` ID.
 
 ## Security assumptions
 
@@ -274,7 +309,7 @@ The repository layout intentionally mirrors `v4-hooks-public`. A direct upstream
 - adding/pinning the DeepState dependency or an accepted minimal interface/math surface;
 - switching standalone remapped imports to the upstream-relative form where required;
 - adding DeepState to the upstream Aggregator Hooks documentation;
-- updating the upstream hook-mining flow with the maintainer-assigned identifier;
+- updating the upstream hook-mining flow with the identifier agreed for the upstream integration;
 - passing the upstream formatter, coverage, fork, fuzz, USDT, static-analysis, and CI requirements.
 
 The implementation is already a singleton and intentionally has no factory.
