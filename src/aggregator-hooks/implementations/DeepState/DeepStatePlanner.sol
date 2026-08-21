@@ -78,6 +78,10 @@ contract DeepStatePlanner is IDeepStatePlanner {
                 (uint256 grossQuote, int32 bidExactInputLastTick) =
                     _quoteExactBase(book, bidRoot, uint160(specified), true);
 
+                // Canonical DeepState credits aggregate quote settlement through a signed int256 delta.
+                // Multiple individually valid resting BIDs can therefore still be unexecutable in aggregate.
+                if (grossQuote > uint256(type(int256).max)) revert AmountTooLarge();
+
                 result.amountTake = specified;
                 result.deepStateInput = specified;
                 result.amountOut = _netAfterFees(grossQuote, feeBps);
@@ -90,6 +94,11 @@ contract DeepStatePlanner is IDeepStatePlanner {
             // minimum token0 quantity whose gross bid quote reaches the exact gross-up target.
             (uint160 baseIn, uint256 grossQuoteOut, int32 bidExactOutputLastTick) =
                 _baseForNetQuoteOutput(book, bidRoot, specified, feeBps);
+
+            // Keep the signed settlement invariant local to every returned zero-to-one plan. Under the
+            // current uint160 specified-amount bound this is defensive for exact-output, and protects any
+            // future widening of that public input domain.
+            if (grossQuoteOut > uint256(type(int256).max)) revert AmountTooLarge();
 
             result.amountTake = baseIn;
             result.deepStateInput = baseIn;

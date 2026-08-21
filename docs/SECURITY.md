@@ -32,6 +32,10 @@ fillOrKill = true
 
 The integration does not intentionally leave taker orders resting on the external book.
 
+### Signed DeepState settlement domain
+
+Canonical DeepState represents aggregate token settlement with signed `int256` deltas. The Planner therefore rejects zero-to-one plans whose cumulative gross BID quote exceeds `int256.max`, even when each resting maker order is individually valid. This keeps the public Planner API from returning a fill-or-kill plan that canonical DeepState cannot settle.
+
 ### Physical balance verification
 
 The hook verifies the actual input consumed and output received from DeepState against the freshly constructed plan.
@@ -46,7 +50,7 @@ The Aggregator uses `PoolManager.take()` and settlement operations through the i
 
 The DeepState address and Planner are immutable after deployment.
 
-The mutable `routingFeeRecipient` controls only the destination of the fixed DeepState integrator fee; it does not control pool admission or swap execution.
+The mutable `routingFeeRecipient` controls only the destination of the fixed DeepState integrator fee; it does not control pool admission or swap execution. Recipient rotation is intentionally authorized by the current recipient and is a privileged operational action; the current implementation uses a one-step handoff rather than a two-step acceptance flow.
 
 ## Token model
 
@@ -114,6 +118,25 @@ The repository includes:
 - static analysis with Slither.
 
 These checks are development evidence, not a substitute for independent review.
+
+## V12 security review
+
+V12 performed a **Full audit** of pre-remediation commit `b8f219a` (`main`). The public report lists **one Medium-risk finding**, **F-244822 — `Bound aggregate quote to the settlement domain`**:
+
+<https://v12.sh/runs/6851/public>
+
+The finding demonstrated that multiple individually settleable resting BIDs can produce a cumulative zero-to-one gross quote above canonical DeepState's signed `int256` settlement domain. The V12 PoC exercised the zero-to-one exact-input branch with the real Planner and canonical DeepState and observed settlement revert with `DeltaOverflow`. The public report recommends rejecting both zero-to-one branches when their cumulative gross quote exceeds `int256.max`.
+
+The remediation is intentionally narrow:
+
+- zero-to-one exact-input planning rejects `grossQuote > int256.max`;
+- zero-to-one exact-output planning rejects `grossQuoteOut > int256.max`;
+- a regression test builds the over-domain BID book against the real DeepState engine and requires `DeepStatePlanner.AmountTooLarge`;
+- the full project test suite was rerun successfully after the change.
+
+The current code is therefore **post-audit/post-remediation** code and is not byte-for-byte identical to the audited commit. No other findings are listed in the public V12 report.
+
+The raw V12 export supplied during development also contains ten additional Low-severity candidate entries marked `Invalid`. Those entries are preserved in [`../audits/V12_RAW_EXPORT.md`](../audits/V12_RAW_EXPORT.md) for traceability only; they are not findings in the public V12 report and were not used to claim additional audited issues. See [`V12_AUDIT.md`](./V12_AUDIT.md) for the exact distinction and project disposition.
 
 ## Accepted limitations
 

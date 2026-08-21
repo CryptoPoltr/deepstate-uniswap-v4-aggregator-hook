@@ -99,6 +99,22 @@ The Aggregator settles exactly the requested v4 output. Any allowed surplus rema
 
 The plan validation also preserves enough signed-int128 headroom for the maximum supported Uniswap aggregator protocol fee.
 
+## Signed DeepState settlement domain
+
+Canonical DeepState represents aggregate settlement with signed `int256` deltas. This creates a source-domain constraint that is distinct from the narrower signed `int128` delta domain enforced later by the Uniswap v4 Aggregator Hook.
+
+For zero-to-one execution, the Planner can consume multiple resting BIDs. Each resting BID may be individually valid while their cumulative gross quote exceeds `int256.max`; such an aggregate cannot be credited by canonical DeepState settlement.
+
+`DeepStatePlanner` therefore treats the signed DeepState settlement domain as part of plan executability:
+
+```text
+zeroToOne gross BID quote <= int256.max
+```
+
+Both zero-to-one planning branches enforce this before returning a `Plan`. V12 F-244822 reproduced the exact-input branch and recommended applying the bound to both zero-to-one paths. The exact-output check also keeps the source settlement invariant local to every returned zero-to-one plan. See the [public V12 report](https://v12.sh/runs/6851/public).
+
+This Planner-level bound is intentionally separate from `DeepStateAggregator._validatePlan()`, which additionally requires the v4-facing `amountTake` and `amountOut` values to fit the smaller signed `int128` settlement representation used by the Aggregator Hook flow.
+
 ## Settlement verification
 
 The Aggregator snapshots its token balances around the DeepState fill.

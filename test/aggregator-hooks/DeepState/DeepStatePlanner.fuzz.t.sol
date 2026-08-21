@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {TickMath32} from "deepstate-contracts/src/libraries/TickMath32.sol";
+
 import {IDeepStateV1} from "../../../src/aggregator-hooks/implementations/DeepState/interfaces/IDeepStateV1.sol";
 import {
     IDeepStatePlanner
@@ -17,6 +20,16 @@ contract DeepStatePlannerFuzz is DeepStateFuzzBase {
     function setUp() public {
         _setUpRealDeepState();
         planner = new DeepStatePlanner(IDeepStateV1(address(engine)));
+    }
+
+    /// @dev Regression for V12 #244822. Canonical DeepState can accept each resting BID independently
+    ///      while the aggregate quote of a later FOK ASK exceeds its signed int256 settlement domain.
+    function test_regression_zeroForOneExactInput_rejectsAggregateQuoteOutsideSignedSettlementDomain() public {
+        _buildOverSignedDomainBidBook();
+
+        uint256 amountIn = _overSignedDomainBaseQuantity();
+        vm.expectRevert(DeepStatePlanner.AmountTooLarge.selector);
+        planner.plan(address(token0), address(token1), true, -int256(amountIn));
     }
 
     function testFuzz_planExactInput_zeroForOne_matchesRealDeepState(
@@ -87,6 +100,61 @@ contract DeepStatePlannerFuzz is DeepStateFuzzBase {
 
         assertGe(p.amountOut, requestedOut);
         _assertPlanExecutes(p, false);
+    }
+
+    function _buildOverSignedDomainBidBook() internal {
+        // Give the maker enough token1 collateral for two individually valid near-max signed quote orders.
+        token1.mint(maker, type(uint256).max - token1.totalSupply());
+
+        uint160 firstQuantity = _maxQuantityWhoseBidQuoteFitsInt256(type(int32).max);
+        uint160 secondQuantity = _maxQuantityWhoseBidQuoteFitsInt256(type(int32).max - 1);
+        if (uint256(firstQuantity) + uint256(secondQuantity) > type(uint160).max) {
+            secondQuantity = type(uint160).max - firstQuantity;
+            while (_bidQuote(type(int32).max - 1, secondQuantity) > uint256(type(int256).max)) {
+                --secondQuantity;
+            }
+        }
+
+        uint256 firstQuote = _bidQuote(type(int32).max, firstQuantity);
+        uint256 secondQuote = _bidQuote(type(int32).max - 1, secondQuantity);
+        assertLe(firstQuote, uint256(type(int256).max));
+        assertLe(secondQuote, uint256(type(int256).max));
+        assertGt(firstQuote + secondQuote, uint256(type(int256).max));
+
+        _rest(type(int32).max, firstQuantity, true);
+        _rest(type(int32).max - 1, secondQuantity, true);
+    }
+
+    function _overSignedDomainBaseQuantity() internal pure returns (uint256 amountIn) {
+        uint160 firstQuantity = _maxQuantityWhoseBidQuoteFitsInt256(type(int32).max);
+        uint160 secondQuantity = _maxQuantityWhoseBidQuoteFitsInt256(type(int32).max - 1);
+        if (uint256(firstQuantity) + uint256(secondQuantity) > type(uint160).max) {
+            secondQuantity = type(uint160).max - firstQuantity;
+            while (_bidQuote(type(int32).max - 1, secondQuantity) > uint256(type(int256).max)) {
+                --secondQuantity;
+            }
+        }
+        amountIn = uint256(firstQuantity) + uint256(secondQuantity);
+    }
+
+    function _maxQuantityWhoseBidQuoteFitsInt256(int32 tick) internal pure returns (uint160 quantity) {
+        (uint256 factor, uint16 shift) = TickMath32.getPriceFactorAtTick(tick);
+        uint256 denominator = uint256(1) << shift;
+        uint256 candidate = Math.mulDiv(uint256(type(int256).max), denominator, factor);
+        if (candidate > type(uint160).max) candidate = type(uint160).max;
+        quantity = uint160(candidate);
+        while (_bidQuote(tick, quantity) > uint256(type(int256).max)) {
+            --quantity;
+        }
+    }
+
+    function _bidQuote(int32 tick, uint160 quantity) internal pure returns (uint256 quoteAmount) {
+        if (quantity == 0) return 0;
+        if (tick == 0) return quantity;
+        (uint256 factor, uint16 shift) = TickMath32.getPriceFactorAtTick(tick);
+        uint256 denominator = uint256(1) << shift;
+        quoteAmount = Math.mulDiv(uint256(quantity), factor, denominator);
+        if (mulmod(uint256(quantity), factor, denominator) != 0) ++quoteAmount;
     }
 
     function _assertPlanExecutes(IDeepStatePlanner.Plan memory p, bool zeroToOne) internal {

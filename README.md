@@ -146,7 +146,12 @@ test/
 
 docs/
 ├── ARCHITECTURE.md
-└── SECURITY.md
+├── SECURITY.md
+└── V12_AUDIT.md
+
+audits/
+├── README.md
+└── V12_RAW_EXPORT.md
 ```
 
 ## Build and test
@@ -217,6 +222,20 @@ FOUNDRY_PROFILE=aggregator_hooks slither . \
   --json slither.json
 ```
 
+## Security review
+
+V12 performed a **Full audit** of repository commit `b8f219a` (`main`). The public report covers the repository `src` scope (899 LoC) and identifies **one Medium-risk finding**, **F-244822 — `Bound aggregate quote to the settlement domain`**.
+
+**Official V12 report:** <https://v12.sh/runs/6851/public>
+
+F-244822 showed that the zero-to-one Planner could accumulate multiple individually settleable resting BIDs into a gross quote above canonical DeepState's signed `int256` settlement domain. The V12 PoC reproduced this on the zero-to-one exact-input path using the real `DeepStatePlanner` and canonical `DeepstateV1`; the resulting plan reverted during DeepState settlement with `DeltaOverflow`. V12 recommended enforcing the signed settlement bound on both zero-to-one planning branches before returning a plan.
+
+The repository now contains that remediation: `DeepStatePlanner` rejects `grossQuote` / `grossQuoteOut > int256.max` for zero-to-one plans, and a regression test reproduces the exact-input over-domain condition against the real DeepState engine and expects `AmountTooLarge`. The full project test suite was rerun successfully after the change.
+
+The audited commit is therefore the **pre-remediation** baseline; the current code is the post-audit version containing the fix. No other findings are listed in the public V12 report. A raw review export supplied during development also contained additional candidate entries marked `Invalid`; those are retained only for traceability and are not presented as findings from the public report.
+
+See [`docs/V12_AUDIT.md`](./docs/V12_AUDIT.md) for the exact audit/remediation record, [`audits/README.md`](./audits/README.md) for report artifacts, and [`docs/SECURITY.md`](./docs/SECURITY.md) for the resulting security invariant and trust boundaries.
+
 ## Deployment
 
 1. Select the canonical DeepState V1 deployment for the target chain.
@@ -267,6 +286,7 @@ The implementation is already a singleton and intentionally has no factory.
 - DeepState whitepaper: <https://github.com/Deepstate-Protocol/whitepaper>
 - DeepState contracts: <https://github.com/Deepstate-Protocol/deepstate-contracts>
 - Background on DeepState and Joseph DeLong: <https://thedefiant.io/news/defi/ex-sushi-cto-joseph-delong-to-launch-order-book-dex-on-robinhood-chain>
+- V12 public audit report: <https://v12.sh/runs/6851/public>
 - Uniswap `v4-hooks-public` Aggregator Hooks: <https://github.com/Uniswap/v4-hooks-public/blob/main/src/aggregator-hooks/README.md>
 - Uniswap Aggregator Hook testing requirements: <https://github.com/Uniswap/v4-hooks-public/blob/main/test/aggregator-hooks/README.md>
 - Uniswap v4 core: <https://github.com/Uniswap/v4-core>
